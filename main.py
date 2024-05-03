@@ -1,86 +1,36 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
-import psycopg2
+from fastapi import Depends, FastAPI, HTTPException
+from sqlalchemy.orm import Session
+
+import crud, models, schemas
+from database import SessionLocal, engine
 
 
-class Item(BaseModel):
-    name: str
-    description: str
-    price: float
-
-class Rating(BaseModel):
-    name: str
-    description: str
-    rating: float
-    release_date: str
-
+models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-conn = psycopg2.connect(database="postgres",
-                        host="localhost",
-                        user="postgres",
-                        password="test123",
-                        port="5433")
-
-cursor = conn.cursor() 
-
-
-@app.get("/")
-async def root():
-    return {"message": "Hello World"}
-
-
-@app.get("/items/{item_id}")
-async def read_item(item_id: int):
-    return {"item_id": item_id}
-
-@app.get("/items/{urls}")
-async def geturlitems(
-    urls: str, num: int = 0, answer: int = 2):
-    item = {"item_id": urls, "num": num, "answer": answer}
-    return item
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 
-@app.get("/get_movies")
-async def get_movies():
-    cursor.execute("SELECT * FROM MOVIES")
-    return cursor.fetchall()
+@app.post("/create_student/", response_model=schemas.Student)
+async def create_student(student: schemas.StudentCreate, db: Session = Depends(get_db)):
+    return crud.create_student(db=db, student=student)
 
 
+@app.get("/get_student", response_model=schemas.Student)
+async def get_student(name: str, db: Session = Depends(get_db)):
+    return crud.get_student(name=name, db=db)
 
-@app.post("/add")
-async def add_movie(rating: Rating):
-    cursor.execute('''INSERT INTO MOVIES(NAME, DESCRIPTION, RATING, RELEASE_DATE
-   ) VALUES ('{name}', '{description}', {rating}, '{release_date}')'''.format(name = rating.name,
-                                            description = rating.description, 
-                                            rating = rating.rating, 
-                                            release_date = rating.release_date))
+@app.delete("/delete_student")
+async def delete_student(name: str, db: Session = Depends(get_db)):
+    return crud.delete_student(db=db, name=name)
 
-    conn.commit()
-
-
-@app.post("/update_rating")
-async def update_rating(name: str, new_rating: float):
-    cursor.execute('''UPDATE MOVIES
-    SET RATING = {new_rating}
-    WHERE NAME = '{name}' '''.format(new_rating = new_rating, name = name))
-    conn.commit()
-
-
-
-@app.delete("/delete")
-async def remove_movie(name: str):
-    cursor.execute(f"DELETE FROM MOVIES WHERE NAME='{name}'")
-    conn.commit()
-
-
-
-
-
-
-conn.commit()
-
-cursor.execute("SELECT * FROM MOVIES")
-print(cursor.fetchall())
+@app.put("/update_mark")
+async def update_student(name: str, mark: float, db: Session = Depends(get_db)):
+    return crud.update_student_mark(db=db, name=name, new_mark=mark)
